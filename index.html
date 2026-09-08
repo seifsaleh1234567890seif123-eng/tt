@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>لوحة طلبات العملاء | ELMOHANDS PlayStation Lounge</title>
+  <meta name="description" content="لوحة متابعة وإدارة طلبات العملاء الخاصة بالعمال والموظفين - ELMOHANDS" />
+
+  <!-- Google Fonts: Cairo & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Standalone Dashboard Styles -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="orders-dashboard-body">
+
+  <!-- Audio Chime for new order alert -->
+  <audio id="order-alert-sound" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+  </audio>
+
+  <!-- Ambient Glow -->
+  <div class="ambient-glow orb-1"></div>
+  <div class="ambient-glow orb-2"></div>
+
+  <!-- ==================== HEADER BAR ==================== -->
+  <header class="orders-header-bar">
+    <div class="container orders-header-container">
+      
+      <div class="orders-brand">
+        <img src="../assets/images/nav_logo.jpg" alt="Logo" class="orders-brand-img" onerror="this.src='../gta.jpeg'" />
+        <div class="orders-brand-info">
+          <div class="orders-title-main">
+            ELMOHANDS
+            <span class="orders-badge-staff"><i class="fa-solid fa-user-gear"></i> خاص بالعمال فقط</span>
+          </div>
+          <span style="font-size: 0.78rem; color: var(--text-muted);">لوحة متابعة طلبات الألعاب المباشرة</span>
+        </div>
+      </div>
+
+      <div class="orders-header-actions">
+        <!-- Live Clock -->
+        <div class="live-clock-badge" id="live-clock-badge">
+          <i class="fa-regular fa-clock"></i>
+          <span id="live-clock-time">00:00:00</span>
+        </div>
+
+        <!-- Sound Notification Toggle -->
+        <button id="btn-sound-toggle" class="btn-sound-toggle sound-enabled" title="تفعيل / كتم صوت الإشعار عند وصول طلب جديد">
+          <i class="fa-solid fa-bell" id="sound-icon"></i>
+          <span id="sound-text">صوت التنبيه: مفعل</span>
+        </button>
+
+        <!-- Refresh Button -->
+        <button id="btn-manual-refresh" class="admin-bar-btn btn-primary-neon" title="تحديث يدوي">
+          <i class="fa-solid fa-rotate"></i> تحديث الآن
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== MAIN DASHBOARD CONTENT ==================== -->
+  <main class="dashboard-main-content">
+    <div class="container">
+
+      <!-- 1. Stats Counter Cards -->
+      <div class="orders-stats-grid">
+        
+        <div class="stat-card stat-total">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-cubes"></i></div>
+          <div class="stat-info">
+            <span class="stat-number" id="stat-total-count">0</span>
+            <span class="stat-label">إجمالي الطلبات</span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-pending">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-hourglass-half"></i></div>
+          <div class="stat-info">
+            <span class="stat-number" id="stat-pending-count">0</span>
+            <span class="stat-label">طلبات جديدة (قيد الانتظار)</span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-contacted">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-headset"></i></div>
+          <div class="stat-info">
+            <span class="stat-number" id="stat-contacted-count">0</span>
+            <span class="stat-label">تم التواصل مع العميل</span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-completed">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-circle-check"></i></div>
+          <div class="stat-info">
+            <span class="stat-number" id="stat-completed-count">0</span>
+            <span class="stat-label">طلبات مكتملة ومسلمة</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 2. Controls & Search Toolbar -->
+      <div class="orders-toolbar">
+        
+        <div class="toolbar-top-row">
+          <div class="search-box-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input 
+              type="text" 
+              id="orders-search-input" 
+              class="search-input-field" 
+              placeholder="ابحث باسم العميل، رقم الهاتف، أو اسم اللعبة..." 
+            />
+          </div>
+
+          <div class="toolbar-filter-selects">
+            <!-- Console Filter (PS4 / PS5) -->
+            <select id="filter-console-select" class="filter-select">
+              <option value="all">جميع الأجهزة (PS4 و PS5)</option>
+              <option value="PS5">PlayStation 5 (PS5) ⚡</option>
+              <option value="PS4">PlayStation 4 (PS4) 🎮</option>
+            </select>
+
+            <!-- Version Filter (برايمري / سكندري) -->
+            <select id="filter-version-select" class="filter-select">
+              <option value="all">جميع النسخ (برايمري وسكندري)</option>
+              <option value="برايمري">برايمري فقط 👑</option>
+              <option value="سكندري">سكندري فقط 🎮</option>
+            </select>
+
+            <!-- Date Filter -->
+            <select id="filter-date-select" class="filter-select">
+              <option value="all">جميع التواريخ</option>
+              <option value="today">طلبات اليوم فقط</option>
+              <option value="week">آخر 7 أيام</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="toolbar-bottom-row">
+          <!-- Status Pills -->
+          <div class="status-pills">
+            <button class="status-pill-btn active" data-status="all">الكل (<span id="pill-count-all">0</span>)</button>
+            <button class="status-pill-btn" data-status="جديد">جديد (<span id="pill-count-new">0</span>)</button>
+            <button class="status-pill-btn" data-status="تم التواصل">تم التواصل (<span id="pill-count-contacted">0</span>)</button>
+            <button class="status-pill-btn" data-status="مكتمل">مكتمل (<span id="pill-count-completed">0</span>)</button>
+            <button class="status-pill-btn" data-status="ملغي">ملغي (<span id="pill-count-cancelled">0</span>)</button>
+          </div>
+
+          <div class="toolbar-quick-actions">
+            <button id="btn-export-orders" class="admin-bar-btn btn-secondary-neon" title="تصدير الطلبات">
+              <i class="fa-solid fa-file-export"></i> تصدير CSV
+            </button>
+            <button id="btn-clear-completed" class="admin-bar-btn btn-outline-danger" title="حذف جميع الطلبات المكتملة">
+              <i class="fa-solid fa-broom"></i> تنظيف المكتمل
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 3. Orders List Table / Cards -->
+      <div class="orders-container-box">
+        
+        <div class="orders-list-header">
+          <div class="orders-count-indicator">
+            <i class="fa-solid fa-clipboard-list" style="color: var(--accent-cyan);"></i>
+            <span>قائمة طلبات العملاء</span>
+            <span class="orders-count-badge" id="visible-orders-count">0</span>
+          </div>
+
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            <i class="fa-solid fa-bolt" style="color: #22c55e;"></i> تحديث سحابي ولحظي تلقائي
+          </div>
+        </div>
+
+        <div class="orders-grid-cards" id="orders-list-container">
+          <!-- Populated by orders.js -->
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Toast Notification Alert -->
+  <div id="gamer-toast" class="gamer-toast" style="display: none;">
+    <div class="toast-content">
+      <i class="toast-icon fa-solid fa-circle-check" id="toast-icon"></i>
+      <span class="toast-msg" id="toast-msg">تمت العملية بنجاح</span>
+    </div>
+  </div>
+
+  <!-- Firebase Cloud SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+
+  <!-- Dashboard JavaScript Engine -->
+  <script src="orders.js"></script>
+</body>
+</html>
