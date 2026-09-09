@@ -13,16 +13,25 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeDateFilter = 'all';
   let isSoundEnabled = true;
 
-  // Fallback controller thumbnail SVG (loads instantly with 0 external requests)
+  // Fallback controller thumbnail SVG
   const DEFAULT_GAME_THUMB = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='70' viewBox='0 0 60 70'><rect width='60' height='70' fill='%23090d16' rx='6'/><path d='M18 32h24M30 20v24M40 32a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-20 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0z' stroke='%2300f0ff' stroke-width='2' stroke-linecap='round'/><circle cx='30' cy='50' r='3' fill='%2300f0ff' opacity='0.5'/></svg>";
 
-  const resolveImg = (src) => {
+  // Multi-tier Smart Image Resolver
+  const resolveImgPath = (src) => {
     if (!src) return DEFAULT_GAME_THUMB;
     if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
       return src;
     }
-    // If local relative path
-    return src.startsWith('../') ? src : '../' + src;
+    const filename = src.split('/').pop().split('\\').pop();
+    return `assets/games/${filename}`;
+  };
+
+  const getImgFallbackAttr = (src) => {
+    if (!src || src.startsWith('data:') || src.startsWith('http')) {
+      return `this.onerror=null; this.src='${DEFAULT_GAME_THUMB}';`;
+    }
+    const filename = src.split('/').pop().split('\\').pop();
+    return `this.onerror=null; this.src='../${filename}'; this.onerror=function(){ this.src='${DEFAULT_GAME_THUMB}'; };`;
   };
 
   // --------------------------------------------------------------------------
@@ -39,12 +48,61 @@ document.addEventListener('DOMContentLoaded', () => {
   updateClock();
 
   // --------------------------------------------------------------------------
-  // 2. AUDIO NOTIFICATION ENGINE
+  // 2. DUAL AUDIO & BACKGROUND NOTIFICATION ENGINE
   // --------------------------------------------------------------------------
   const alertAudio = document.getElementById('order-alert-sound');
   const soundToggleBtn = document.getElementById('btn-sound-toggle');
   const soundIcon = document.getElementById('sound-icon');
   const soundText = document.getElementById('sound-text');
+  let originalPageTitle = document.title;
+  let titleFlashInterval = null;
+
+  // Web Audio API Synthesizer (Plays in foreground & background tabs reliably)
+  const playSynthesizedChime = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const notes = [587.33, 880, 1174.66]; // D5, A5, D6 chime chord
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.14);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + idx * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.14);
+        osc.stop(ctx.currentTime + idx * 0.14 + 0.4);
+      });
+    } catch (e) {
+      console.warn('Web Audio note:', e);
+    }
+  };
+
+  // Request browser notification permissions on first interaction
+  const requestNotificationPermission = () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  };
+
+  document.addEventListener('click', () => {
+    requestNotificationPermission();
+    // Unlock audio context
+    if (alertAudio) {
+      try {
+        alertAudio.play().then(() => {
+          alertAudio.pause();
+          alertAudio.currentTime = 0;
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  }, { once: true });
 
   soundToggleBtn?.addEventListener('click', () => {
     isSoundEnabled = !isSoundEnabled;
@@ -55,15 +113,75 @@ document.addEventListener('DOMContentLoaded', () => {
     if (soundText) {
       soundText.textContent = isSoundEnabled ? 'صوت التنبيه: مفعل' : 'صوت التنبيه: مكتوم';
     }
-    showToast(isSoundEnabled ? 'تم تفعيل صوت التنبيه 🔔' : 'تم كتم صوت التنبيه 🔕');
+    if (isSoundEnabled) {
+      playNewOrderAlert();
+      showToast('تم تفعيل صوت التنبيه 🔔');
+    } else {
+      showToast('تم كتم صوت التنبيه 🔕');
+    }
   });
 
-  const playNewOrderSound = () => {
-    if (isSoundEnabled && alertAudio) {
+  const flashTabTitle = (newOrder) => {
+    if (titleFlashInterval) clearInterval(titleFlashInterval);
+    let state = false;
+    titleFlashInterval = setInterval(() => {
+      document.title = state ? `🔔 (طلب جديد!) ${newOrder?.customerName || 'عميل'}` : `⚡ ${originalPageTitle}`;
+      state = !state;
+    }, 800);
+
+    const onFocus = () => {
+      if (titleFlashInterval) {
+        clearInterval(titleFlashInterval);
+        titleFlashInterval = null;
+      }
+      document.title = originalPageTitle;
+      window.removeEventListener('focus', onFocus);
+    };
+    window.addEventListener('focus', onFocus);
+  };
+
+  const playNewOrderAlert = (newOrder = null) => {
+    if (!isSoundEnabled) return;
+
+    // 1. Play MP3 Audio Element
+    if (alertAudio) {
       try {
         alertAudio.currentTime = 0;
-        alertAudio.play().catch(() => {});
+        const playPromise = alertAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => playSynthesizedChime());
+        }
+      } catch (e) {
+        playSynthesizedChime();
+      }
+    } else {
+      playSynthesizedChime();
+    }
+
+    // 2. Secondary Web Audio Synthesizer Guarantee
+    playSynthesizedChime();
+
+    // 3. System Notification (when tab is in background or minimized)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        const title = '🔔 وصل طلب جديد في المتجر!';
+        const body = newOrder ? `${newOrder.customerName || 'عميل'} - ${newOrder.gameTitle || 'ألعاب PlayStation'}` : 'طلب جديد وصل في لوحة التحكم';
+        const notif = new Notification(title, {
+          body,
+          icon: 'assets/images/nav_logo.jpg',
+          tag: 'new-order-alert',
+          renotify: true
+        });
+        notif.onclick = () => {
+          window.focus();
+          notif.close();
+        };
       } catch (e) {}
+    }
+
+    // 4. Flash Tab Title if not active
+    if (document.hidden) {
+      flashTabTitle(newOrder);
     }
   };
 
@@ -338,9 +456,12 @@ document.addEventListener('DOMContentLoaded', () => {
           const gConsole = g.consoleType || 'PS5';
           const isG5 = gConsole.includes('PS5') || gConsole.includes('5');
           const isGPrimary = (g.accountType || '').includes('برايمري');
+          const imgSrc = resolveImgPath(g.image);
+          const fallbackAttr = getImgFallbackAttr(g.image);
+
           return `
             <div class="order-game-item-subrow">
-              <img src="${resolveImg(g.image)}" alt="${g.title}" class="order-game-mini-thumb" onerror="this.onerror=null; this.src='${DEFAULT_GAME_THUMB}';" />
+              <img src="${imgSrc}" alt="${g.title}" class="order-game-mini-thumb" onerror="${fallbackAttr}" />
               <div class="order-game-mini-info">
                 <span class="order-game-mini-title" title="${g.title}">${g.title}</span>
                 <div class="order-badges-wrap">
@@ -371,10 +492,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const isPrimary = (order.accountType || '').includes('برايمري');
         const consoleText = order.consoleType || 'PlayStation 5';
         const isPS5 = consoleText.includes('PS5') || consoleText.includes('5');
+        const imgSrc = resolveImgPath(order.gameImage);
+        const fallbackAttr = getImgFallbackAttr(order.gameImage);
 
         gamesColumnHtml = `
           <div class="order-col-game">
-            <img src="${resolveImg(order.gameImage)}" alt="${order.gameTitle}" class="order-game-thumb-img" onerror="this.onerror=null; this.src='${DEFAULT_GAME_THUMB}';" />
+            <img src="${imgSrc}" alt="${order.gameTitle}" class="order-game-thumb-img" onerror="${fallbackAttr}" />
             <div class="order-game-details">
               <span class="order-id-tag">#${order.id}</span>
               <h4 class="order-game-name" title="${order.gameTitle}">${order.gameTitle}</h4>
@@ -641,9 +764,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return tB - tA;
     });
 
+    // Detect new incoming order
     if (!isInitialLoad && list.length > allOrders.length) {
-      playNewOrderSound();
-      showToast('🔔 وصل طلب عميل جديد الآن!');
+      const newest = list[0];
+      playNewOrderAlert(newest);
+      showToast(`🔔 وصل طلب جديد: ${newest.customerName} (${newest.gameTitle})`);
     }
 
     allOrders = list;
@@ -695,8 +820,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // 4. Polling fallback every 4000ms
-    setInterval(fetchCloudOrdersDirect, 4000);
+    // 4. Polling fallback every 3000ms
+    setInterval(fetchCloudOrdersDirect, 3000);
 
     // 5. BroadcastChannel for instant local tab sync
     try {
