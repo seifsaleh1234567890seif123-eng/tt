@@ -462,46 +462,77 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
       }
 
-      row.innerHTML = `
-        <!-- Game & ID & Console Column -->
-        ${gamesColumnHtml}
+      const cleanPhone = (order.customerPhone || '').replace(/\D/g, '');
+      const waPhone = cleanPhone.startsWith('0') ? '2' + cleanPhone : cleanPhone;
+      const waMsg = encodeURIComponent(`مرحباً ${order.customerName || 'يا غالي'}، بخصوص طلبك من ELMOHANDS (طلب #${order.id}) للألعاب: ${order.gameTitle}`);
+      const waLink = cleanPhone ? `https://wa.me/${waPhone}?text=${waMsg}` : '#';
 
-        <!-- Customer Info -->
-        <div class="order-col-customer">
-          <div class="customer-name-display">
-            <i class="fa-solid fa-user" style="color: var(--accent-cyan);"></i>
-            <span>${order.customerName || 'بدون اسم'}</span>
+      row.innerHTML = `
+        <!-- Card Top Bar: ID & Time -->
+        <div class="order-mobile-topbar">
+          <div class="order-id-badge-wrap">
+            <span class="order-id-tag">#${order.id}</span>
+            ${hasMultipleGames ? `<span class="order-items-count-badge"><i class="fa-solid fa-cart-shopping"></i> ${itemsCount} ألعاب</span>` : ''}
           </div>
+          <div class="order-time-primary">
+            <i class="fa-regular fa-clock" style="color: var(--accent-cyan);"></i>
+            <span>${order.timeFormatted || ''}</span>
+            <span class="order-time-relative">(${getRelativeTime(order.timestamp || order.createdAt)})</span>
+          </div>
+        </div>
+
+        <!-- Games Column / List -->
+        <div class="order-games-container-mobile">
+          ${gamesColumnHtml}
+        </div>
+
+        <!-- Customer Info & Quick Contact Buttons -->
+        <div class="order-col-customer">
+          <div class="customer-info-row">
+            <div class="customer-name-display">
+              <i class="fa-solid fa-circle-user" style="color: var(--accent-cyan);"></i>
+              <span>${order.customerName || 'بدون اسم'}</span>
+            </div>
+            
+            <!-- Quick Contact Links -->
+            <div class="customer-quick-actions">
+              ${cleanPhone ? `
+                <a href="tel:${order.customerPhone}" class="btn-quick-contact btn-call" title="اتصال مباشر">
+                  <i class="fa-solid fa-phone"></i>
+                  <span>اتصال</span>
+                </a>
+                <a href="${waLink}" target="_blank" class="btn-quick-contact btn-wa" title="محادثة واتساب">
+                  <i class="fa-brands fa-whatsapp"></i>
+                  <span>واتساب</span>
+                </a>
+              ` : ''}
+            </div>
+          </div>
+
           <div class="customer-phone-display">
-            <i class="fa-solid fa-phone" style="color: #25D366;"></i>
+            <i class="fa-solid fa-mobile-screen-button" style="color: var(--text-muted);"></i>
             <span>${order.customerPhone || 'بدون رقم'}</span>
           </div>
+
           ${order.notes ? `
-            <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
-              <i class="fa-solid fa-message" style="color: var(--accent-gold);"></i> ${order.notes}
+            <div class="customer-notes-bubble">
+              <i class="fa-solid fa-quote-right" style="color: var(--accent-gold);"></i>
+              <span>${order.notes}</span>
             </div>
           ` : ''}
         </div>
 
-        <!-- Time & Date -->
-        <div class="order-col-time">
-          <div class="order-time-primary">
-            <i class="fa-regular fa-clock" style="color: var(--accent-cyan);"></i>
-            <span>${order.timeFormatted || 'الساعة'}</span>
-          </div>
-          <div class="order-date-secondary">
-            ${order.dateFormatted || ''} (${getRelativeTime(order.timestamp || order.createdAt)})
-          </div>
-        </div>
-
-        <!-- Status Selector -->
+        <!-- Status Selector & Action Footer -->
         <div class="order-col-status">
-          <select class="status-select-badge ${statusClass}" data-id="${order.id}">
-            <option value="جديد" ${statusVal.includes('جديد') ? 'selected' : ''}>⏳ جديد / قيد الانتظار</option>
-            <option value="تم التواصل" ${statusVal.includes('تواصل') ? 'selected' : ''}>📞 تم التواصل</option>
-            <option value="تم التسليم" ${statusVal.includes('مكتمل') || statusVal.includes('تسليم') ? 'selected' : ''}>✅ تم التسليم بنجاح</option>
-            <option value="ملغي" ${statusVal.includes('ملغي') || statusVal.includes('إلغاء') ? 'selected' : ''}>❌ تم الإلغاء</option>
-          </select>
+          <div class="status-select-wrapper">
+            <select class="status-select-badge ${statusClass}" data-id="${order.id}">
+              <option value="جديد" ${statusVal.includes('جديد') ? 'selected' : ''}>⏳ جديد / قيد الانتظار</option>
+              <option value="تم التواصل" ${statusVal.includes('تواصل') ? 'selected' : ''}>📞 تم التواصل مع العميل</option>
+              <option value="تم التسليم" ${statusVal.includes('مكتمل') || statusVal.includes('تسليم') ? 'selected' : ''}>✅ تم التسليم بنجاح</option>
+              <option value="ملغي" ${statusVal.includes('ملغي') || statusVal.includes('إلغاء') ? 'selected' : ''}>❌ تم الإلغاء</option>
+            </select>
+            <i class="fa-solid fa-chevron-down status-select-arrow"></i>
+          </div>
         </div>
       `;
 
