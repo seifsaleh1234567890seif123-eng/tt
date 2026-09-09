@@ -1,10 +1,12 @@
 /* ==========================================================================
-   ELMOHANDS PLAYSTATION LOUNGE - ORDERS DASHBOARD JAVASCRIPT ENGINE
+   ELMOHANDS PLAYSTATION LOUNGE - ULTRA-FAST ORDERS DASHBOARD ENGINE
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
 
   const STORAGE_KEY_ORDERS = 'elmohands_orders_v1';
+  const RTDB_URL = 'https://elmohands-store-default-rtdb.firebaseio.com';
+  
   let allOrders = [];
   let activeStatusFilter = 'all';
   let activeSearchTerm = '';
@@ -13,10 +15,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeDateFilter = 'all';
   let isSoundEnabled = true;
 
-  // Fallback controller thumbnail SVG
+  // Lightweight instant controller thumbnail SVG
   const DEFAULT_GAME_THUMB = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='70' viewBox='0 0 60 70'><rect width='60' height='70' fill='%23090d16' rx='6'/><path d='M18 32h24M30 20v24M40 32a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-20 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0z' stroke='%2300f0ff' stroke-width='2' stroke-linecap='round'/><circle cx='30' cy='50' r='3' fill='%2300f0ff' opacity='0.5'/></svg>";
 
-  // Multi-tier Smart Image Resolver
   const resolveImgPath = (src) => {
     if (!src) return DEFAULT_GAME_THUMB;
     if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
@@ -48,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateClock();
 
   // --------------------------------------------------------------------------
-  // 2. DUAL AUDIO & BACKGROUND NOTIFICATION ENGINE
+  // 2. DUAL AUDIO & BACKGROUND NOTIFICATIONS
   // --------------------------------------------------------------------------
   const alertAudio = document.getElementById('order-alert-sound');
   const soundToggleBtn = document.getElementById('btn-sound-toggle');
@@ -57,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let originalPageTitle = document.title;
   let titleFlashInterval = null;
 
-  // Web Audio API Synthesizer (Plays in foreground & background tabs reliably)
+  // Web Audio Synthesizer (Instant fanfare chime chord)
   const playSynthesizedChime = () => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -66,25 +67,22 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ctx.state === 'suspended') {
         ctx.resume();
       }
-      const notes = [587.33, 880, 1174.66]; // D5, A5, D6 chime chord
+      const notes = [587.33, 880, 1174.66]; // D5, A5, D6 chord
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.14);
-        gain.gain.setValueAtTime(0.4, ctx.currentTime + idx * 0.14);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.4);
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.38);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + idx * 0.14);
-        osc.stop(ctx.currentTime + idx * 0.14 + 0.4);
+        osc.start(ctx.currentTime + idx * 0.12);
+        osc.stop(ctx.currentTime + idx * 0.12 + 0.38);
       });
-    } catch (e) {
-      console.warn('Web Audio note:', e);
-    }
+    } catch (e) {}
   };
 
-  // Request browser notification permissions on first interaction
   const requestNotificationPermission = () => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {});
@@ -93,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.addEventListener('click', () => {
     requestNotificationPermission();
-    // Unlock audio context
     if (alertAudio) {
       try {
         alertAudio.play().then(() => {
@@ -143,14 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const playNewOrderAlert = (newOrder = null) => {
     if (!isSoundEnabled) return;
 
-    // 1. Play MP3 Audio Element
+    // 1. Play MP3 Chime
     if (alertAudio) {
       try {
         alertAudio.currentTime = 0;
-        const playPromise = alertAudio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => playSynthesizedChime());
-        }
+        const p = alertAudio.play();
+        if (p !== undefined) p.catch(() => playSynthesizedChime());
       } catch (e) {
         playSynthesizedChime();
       }
@@ -158,10 +153,10 @@ document.addEventListener('DOMContentLoaded', () => {
       playSynthesizedChime();
     }
 
-    // 2. Secondary Web Audio Synthesizer Guarantee
+    // 2. Synthesized Web Audio guarantee
     playSynthesizedChime();
 
-    // 3. System Notification (when tab is in background or minimized)
+    // 3. System Notification for background / locked device
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
         const title = '🔔 وصل طلب جديد في المتجر!';
@@ -207,44 +202,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     toastTimeout = setTimeout(() => {
       toastEl.style.display = 'none';
-    }, 3200);
+    }, 3000);
   };
 
   // --------------------------------------------------------------------------
-  // 4. FIREBASE CLOUD & REALTIME DATABASE ENGINE
+  // 4. STORAGE HELPERS
   // --------------------------------------------------------------------------
-  const firebaseConfig = {
-    apiKey: "AIzaSyCs-VmEzb7q8oIAzGZ8QpHllPI0yGtdsPA",
-    authDomain: "elmohands-store.firebaseapp.com",
-    databaseURL: "https://elmohands-store-default-rtdb.firebaseio.com",
-    projectId: "elmohands-store",
-    storageBucket: "elmohands-store.firebasestorage.app",
-    messagingSenderId: "577193319663",
-    appId: "1:577193319663:web:fc57174413106afb474f1a",
-    measurementId: "G-8GME76MV08"
-  };
-
-  let rtdb = null;
-  let db = null;
-  try {
-    if (typeof firebase !== 'undefined') {
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      try {
-        rtdb = firebase.database();
-        console.log('Orders dashboard connected to Firebase Realtime Database 🚀');
-      } catch (e) {
-        console.warn('RTDB notice:', e);
-      }
-      try {
-        db = firebase.firestore();
-      } catch (e) {}
-    }
-  } catch (e) {
-    console.warn('Firebase notice:', e);
-  }
-
   const getStoredOrders = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_ORDERS);
@@ -270,23 +233,16 @@ document.addEventListener('DOMContentLoaded', () => {
           }));
         }
       }
-    } catch (e) {
-      console.error('Error loading orders:', e);
-    }
+    } catch (e) {}
     return [];
   };
 
   const saveStoredOrders = (orders) => {
     try {
       localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(orders));
-    } catch (e) {
-      console.error('Error saving orders:', e);
-    }
+    } catch (e) {}
   };
 
-  // --------------------------------------------------------------------------
-  // 5. TIME HELPER (Relative & Clock Formatting)
-  // --------------------------------------------------------------------------
   const getRelativeTime = (timestamp) => {
     if (!timestamp) return 'غير محدد';
     const now = Date.now();
@@ -304,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --------------------------------------------------------------------------
-  // 6. RENDER ORDERS & STATS
+  // 5. RENDER ORDERS & STATS (GPU-Optimized)
   // --------------------------------------------------------------------------
   const ordersContainer = document.getElementById('orders-list-container');
   const visibleCountEl = document.getElementById('visible-orders-count');
@@ -341,7 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterOrders = () => {
     let list = [...allOrders];
 
-    // 1. Status Filter
     if (activeStatusFilter !== 'all') {
       list = list.filter(o => {
         const s = o.status || 'جديد';
@@ -353,7 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // 2. Console Filter (PS4 / PS5)
     if (activeConsoleFilter !== 'all') {
       list = list.filter(o => {
         if (Array.isArray(o.games) && o.games.length > 0) {
@@ -363,7 +317,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // 3. Version Filter (برايمري / سكندري)
     if (activeVersionFilter !== 'all') {
       list = list.filter(o => {
         if (Array.isArray(o.games) && o.games.length > 0) {
@@ -373,7 +326,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // 4. Date Filter
     if (activeDateFilter === 'today') {
       const todayStr = new Date().toLocaleDateString('ar-EG');
       list = list.filter(o => {
@@ -389,7 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
       list = list.filter(o => (o.timestamp || new Date(o.createdAt || 0).getTime()) >= oneWeekAgo);
     }
 
-    // 5. Search Filter (by customer name, phone, game title, console, id)
     if (activeSearchTerm) {
       const q = activeSearchTerm.toLowerCase();
       list = list.filter(o => {
@@ -417,21 +368,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = filterOrders();
 
     if (visibleCountEl) visibleCountEl.textContent = filtered.length;
-
     if (!ordersContainer) return;
 
     if (filtered.length === 0) {
       ordersContainer.innerHTML = `
         <div class="empty-orders-state">
           <div class="empty-icon-wrap"><i class="fa-solid fa-clipboard-check"></i></div>
-          <h3 class="empty-orders-title">لا توجد طلبات تطابق هذا البحث أو الفلتر</h3>
+          <h3 class="empty-orders-title">لا توجد طلبات حالياً</h3>
           <p class="empty-orders-sub">عندما يقوم أي عميل بطلب لعبة من المتجر، ستظهر بياناته هنا فوراً في نفس اللحظة عبر السحابة.</p>
         </div>
       `;
       return;
     }
 
-    ordersContainer.innerHTML = '';
+    const fragment = document.createDocumentFragment();
 
     filtered.forEach(order => {
       const isNew = !order.status || order.status.includes('جديد');
@@ -439,7 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const hasMultipleGames = Array.isArray(order.games) && order.games.length > 0;
       const itemsCount = hasMultipleGames ? order.games.length : 1;
 
-      // Status selector class
       let statusClass = 'status-val-new';
       if (statusVal.includes('تواصل')) statusClass = 'status-val-contacted';
       else if (statusVal.includes('مكتمل') || statusVal.includes('تسليم')) statusClass = 'status-val-completed';
@@ -449,7 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
       row.className = `order-card-row ${isNew ? 'is-new-order' : ''}`;
       row.dataset.id = order.id;
 
-      // Render Games Column HTML
       let gamesColumnHtml = '';
       if (hasMultipleGames) {
         const gamesListHtml = order.games.map(g => {
@@ -461,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           return `
             <div class="order-game-item-subrow">
-              <img src="${imgSrc}" alt="${g.title}" class="order-game-mini-thumb" onerror="${fallbackAttr}" />
+              <img src="${imgSrc}" alt="${g.title}" width="42" height="50" loading="lazy" decoding="async" class="order-game-mini-thumb" onerror="${fallbackAttr}" />
               <div class="order-game-mini-info">
                 <span class="order-game-mini-title" title="${g.title}">${g.title}</span>
                 <div class="order-badges-wrap">
@@ -497,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gamesColumnHtml = `
           <div class="order-col-game">
-            <img src="${imgSrc}" alt="${order.gameTitle}" class="order-game-thumb-img" onerror="${fallbackAttr}" />
+            <img src="${imgSrc}" alt="${order.gameTitle}" width="54" height="64" loading="lazy" decoding="async" class="order-game-thumb-img" onerror="${fallbackAttr}" />
             <div class="order-game-details">
               <span class="order-id-tag">#${order.id}</span>
               <h4 class="order-game-name" title="${order.gameTitle}">${order.gameTitle}</h4>
@@ -557,11 +505,14 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
-      ordersContainer.appendChild(row);
+      fragment.appendChild(row);
     });
 
+    ordersContainer.innerHTML = '';
+    ordersContainer.appendChild(fragment);
+
     // Attach Status change listeners
-    document.querySelectorAll('.status-select-badge').forEach(select => {
+    ordersContainer.querySelectorAll('.status-select-badge').forEach(select => {
       select.addEventListener('change', (e) => {
         const orderId = e.target.dataset.id;
         const newStatus = e.target.value;
@@ -571,41 +522,37 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --------------------------------------------------------------------------
-  // 7. ORDER OPERATIONS (Update Status, Export, Delete)
+  // 6. ORDER OPERATIONS (Update Status, Clear Completed, Export)
   // --------------------------------------------------------------------------
   const updateOrderStatus = (orderId, newStatus) => {
     const idx = allOrders.findIndex(o => o.id === orderId);
     if (idx !== -1) {
       allOrders[idx].status = newStatus;
       allOrders[idx].updatedAt = new Date().toISOString();
-      const updatedOrder = { ...allOrders[idx] };
       saveStoredOrders(allOrders);
 
-      // Notify other local tabs
+      // Instant Local Tab Sync
       try {
         if ('BroadcastChannel' in window) {
           const bc = new BroadcastChannel('elmohands_orders_sync');
-          bc.postMessage({ type: 'STATUS_UPDATE', orderId, order: updatedOrder });
+          bc.postMessage({ type: 'STATUS_UPDATE', orderId, newStatus });
           bc.close();
         }
       } catch (e) {}
 
-      // Realtime Database Cloud Sync
+      // Cloud Sync via Realtime Database & REST PATCH
       if (rtdb) {
         rtdb.ref('orders/' + orderId).update({
           status: newStatus,
-          updatedAt: updatedOrder.updatedAt
-        }).catch(err => console.warn('RTDB status update error:', err));
+          updatedAt: allOrders[idx].updatedAt
+        }).catch(() => {});
       }
 
-      // REST API PATCH fallback
-      try {
-        fetch(`https://elmohands-store-default-rtdb.firebaseio.com/orders/${orderId}.json`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus, updatedAt: updatedOrder.updatedAt })
-        }).catch(() => {});
-      } catch (e) {}
+      fetch(`${RTDB_URL}/orders/${orderId}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, updatedAt: allOrders[idx].updatedAt })
+      }).catch(() => {});
 
       showToast(`تم تغيير حالة الطلب إلى "${newStatus}" سحابياً ✨`);
       renderOrders();
@@ -621,22 +568,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (confirm(`هل أنت متأكد من حذف جميع الطلبات المكتملة (${completedOrders.length} طلب)؟`)) {
+      // 1. Immediately remove from local state
       allOrders = allOrders.filter(o => !o.status || (!o.status.includes('مكتمل') && !o.status.includes('تسليم')));
       saveStoredOrders(allOrders);
+      renderOrders();
 
-      // Delete from Realtime Database Cloud
+      // 2. Delete each completed order from Cloud Realtime Database
       completedOrders.forEach(o => {
         if (rtdb) {
           rtdb.ref('orders/' + o.id).remove().catch(() => {});
         }
-        try {
-          fetch(`https://elmohands-store-default-rtdb.firebaseio.com/orders/${o.id}.json`, {
-            method: 'DELETE'
-          }).catch(() => {});
-        } catch (e) {}
+        fetch(`${RTDB_URL}/orders/${o.id}.json`, {
+          method: 'DELETE'
+        }).catch(() => {});
       });
 
-      // Broadcast to all open tabs
+      // 3. Broadcast to all open tabs
       try {
         if ('BroadcastChannel' in window) {
           const bc = new BroadcastChannel('elmohands_orders_sync');
@@ -646,7 +593,6 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) {}
 
       showToast('تم تنظيف الطلبات المكتملة سحابياً بنجاح ✨');
-      renderOrders();
     }
   });
 
@@ -693,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 8. EVENT LISTENERS FOR FILTERS & SEARCH
+  // 7. EVENT LISTENERS FOR FILTERS & SEARCH
   // --------------------------------------------------------------------------
   const searchInput = document.getElementById('orders-search-input');
   searchInput?.addEventListener('input', (e) => {
@@ -719,7 +665,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderOrders();
   });
 
-  // Status pills click
   document.querySelectorAll('.status-pill-btn').forEach(pill => {
     pill.addEventListener('click', () => {
       document.querySelectorAll('.status-pill-btn').forEach(p => p.classList.remove('active'));
@@ -729,16 +674,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Manual Refresh
   document.getElementById('btn-manual-refresh')?.addEventListener('click', () => {
     fetchCloudOrdersDirect();
     showToast('جاري تحديث قائمة الطلبات سحابياً 🔄');
   });
 
   // --------------------------------------------------------------------------
-  // 9. INSTANT & REALTIME CLOUD SYNCHRONIZATION ENGINE
+  // 8. MULTI-ENGINE REALTIME SYNCHRONIZATION (EventSource SSE + RTDB + Polling)
   // --------------------------------------------------------------------------
   let isInitialLoad = true;
+  let sseEventSource = null;
 
   const processIncomingOrders = (cloudOrdersMap) => {
     const list = [];
@@ -773,13 +718,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return tB - tA;
     });
 
-    // Detect new incoming order
+    // Detect new incoming order for alert
     if (!isInitialLoad && list.length > allOrders.length) {
       const newest = list[0];
       playNewOrderAlert(newest);
       showToast(`🔔 وصل طلب جديد: ${newest.customerName} (${newest.gameTitle})`);
     }
 
+    // Always update allOrders to match cloud state exactly (including empty array when all deleted)
     allOrders = list;
     saveStoredOrders(allOrders);
     renderOrders();
@@ -787,13 +733,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const fetchCloudOrdersDirect = () => {
-    fetch('https://elmohands-store-default-rtdb.firebaseio.com/orders.json')
+    fetch(`${RTDB_URL}/orders.json`)
       .then(res => res.json())
       .then(data => {
         processIncomingOrders(data || {});
       })
       .catch(err => {
-        console.warn('Direct cloud fetch notice:', err);
         if (isInitialLoad) {
           allOrders = getStoredOrders();
           renderOrders();
@@ -802,29 +747,99 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   };
 
+  // 1. Browser Native Server-Sent Events (SSE Stream) - Zero Lag Realtime Push
+  const initSSEStream = () => {
+    try {
+      if (sseEventSource) sseEventSource.close();
+      sseEventSource = new EventSource(`${RTDB_URL}/orders.json`);
+
+      sseEventSource.addEventListener('put', (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed.path === '/') {
+            // Full collection update or wipe
+            processIncomingOrders(parsed.data || {});
+          } else if (parsed.path.startsWith('/')) {
+            const orderId = parsed.path.replace('/', '');
+            if (parsed.data === null) {
+              // Specific order was deleted in real-time on another device
+              allOrders = allOrders.filter(o => o.id !== orderId);
+              saveStoredOrders(allOrders);
+              renderOrders();
+            } else if (typeof parsed.data === 'object') {
+              // Specific order was updated / created
+              const existingIdx = allOrders.findIndex(o => o.id === orderId);
+              if (existingIdx !== -1) {
+                allOrders[existingIdx] = { ...allOrders[existingIdx], ...parsed.data };
+              } else {
+                allOrders.unshift({ id: orderId, ...parsed.data });
+                if (!isInitialLoad) playNewOrderAlert(parsed.data);
+              }
+              saveStoredOrders(allOrders);
+              renderOrders();
+            }
+          }
+        } catch (err) {}
+      });
+
+      sseEventSource.addEventListener('patch', (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed.data && typeof parsed.data === 'object') {
+            Object.keys(parsed.data).forEach(id => {
+              const idx = allOrders.findIndex(o => o.id === id);
+              if (idx !== -1) {
+                allOrders[idx] = { ...allOrders[idx], ...parsed.data[id] };
+              }
+            });
+            saveStoredOrders(allOrders);
+            renderOrders();
+          }
+        } catch (err) {}
+      });
+
+      sseEventSource.onerror = () => {
+        // Auto-reconnect managed by EventSource
+      };
+    } catch (e) {}
+  };
+
   const initOrdersSync = () => {
-    // 1. Initial Local load for instant display
+    // 1. Instant local display
     allOrders = getStoredOrders();
     renderOrders();
 
-    // 2. Direct HTTP fetch for immediate cloud data
+    // 2. Direct HTTP fetch for initial cloud sync
     fetchCloudOrdersDirect();
 
-    // 3. Realtime WebSockets listener via Firebase Realtime Database
-    if (rtdb) {
-      rtdb.ref('orders').on('value', (snapshot) => {
-        const val = snapshot.val();
-        processIncomingOrders(val || {});
-        console.log('⚡ Realtime Database synced orders');
-      }, (err) => {
-        console.warn('Realtime Database listener error:', err);
-      });
-    }
+    // 3. Start Native SSE Stream for millisecond-level instant updates
+    initSSEStream();
 
-    // 4. Polling fallback every 2000ms
-    setInterval(fetchCloudOrdersDirect, 2000);
+    // 4. Firebase Realtime Database SDK Fallback Listener
+    let rtdb = null;
+    try {
+      const firebaseConfig = {
+        apiKey: "AIzaSyCs-VmEzb7q8oIAzGZ8QpHllPI0yGtdsPA",
+        authDomain: "elmohands-store.firebaseapp.com",
+        databaseURL: RTDB_URL,
+        projectId: "elmohands-store",
+        storageBucket: "elmohands-store.firebasestorage.app",
+        messagingSenderId: "577193319663",
+        appId: "1:577193319663:web:fc57174413106afb474f1a"
+      };
+      if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        rtdb = firebase.database();
+        rtdb.ref('orders').on('value', (snapshot) => {
+          processIncomingOrders(snapshot.val() || {});
+        });
+      }
+    } catch (e) {}
 
-    // 5. BroadcastChannel for instant local tab sync
+    // 5. Polling fallback every 1500ms
+    setInterval(fetchCloudOrdersDirect, 1500);
+
+    // 6. BroadcastChannel for instant local cross-tab sync
     try {
       if ('BroadcastChannel' in window) {
         const bc = new BroadcastChannel('elmohands_orders_sync');
@@ -834,11 +849,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (e) {}
 
-    // 6. Window Focus & Visibility events
-    window.addEventListener('focus', fetchCloudOrdersDirect);
+    // 7. Window Focus & Visibility events
+    window.addEventListener('focus', () => {
+      fetchCloudOrdersDirect();
+      initSSEStream();
+    });
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         fetchCloudOrdersDirect();
+        initSSEStream();
       }
     });
   };

@@ -451,6 +451,8 @@ body.orders-dashboard-body {
   transition: background var(--transition-fast);
   gap: 18px;
   position: relative;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 
 .order-card-row:hover {
