@@ -13,13 +13,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeDateFilter = 'all';
   let isSoundEnabled = true;
 
-  // Image helper for paths inside subfolder
+  // Fallback controller thumbnail SVG (loads instantly with 0 external requests)
+  const DEFAULT_GAME_THUMB = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='70' viewBox='0 0 60 70'><rect width='60' height='70' fill='%23090d16' rx='6'/><path d='M18 32h24M30 20v24M40 32a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-20 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0z' stroke='%2300f0ff' stroke-width='2' stroke-linecap='round'/><circle cx='30' cy='50' r='3' fill='%2300f0ff' opacity='0.5'/></svg>";
+
   const resolveImg = (src) => {
-    if (!src) return '../gta.jpeg';
-    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:') || src.startsWith('../')) {
+    if (!src) return DEFAULT_GAME_THUMB;
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
       return src;
     }
-    return '../' + src;
+    // If local relative path
+    return src.startsWith('../') ? src : '../' + src;
   };
 
   // --------------------------------------------------------------------------
@@ -90,11 +93,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --------------------------------------------------------------------------
-  // 4. FIREBASE CLOUD & LOCAL STORAGE ENGINE
+  // 4. FIREBASE CLOUD & REALTIME DATABASE ENGINE
   // --------------------------------------------------------------------------
   const firebaseConfig = {
     apiKey: "AIzaSyCs-VmEzb7q8oIAzGZ8QpHllPI0yGtdsPA",
     authDomain: "elmohands-store.firebaseapp.com",
+    databaseURL: "https://elmohands-store-default-rtdb.firebaseio.com",
     projectId: "elmohands-store",
     storageBucket: "elmohands-store.firebasestorage.app",
     messagingSenderId: "577193319663",
@@ -102,14 +106,22 @@ document.addEventListener('DOMContentLoaded', () => {
     measurementId: "G-8GME76MV08"
   };
 
+  let rtdb = null;
   let db = null;
   try {
     if (typeof firebase !== 'undefined') {
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
       }
-      db = firebase.firestore();
-      console.log('Orders dashboard connected to Firebase Firestore 🚀');
+      try {
+        rtdb = firebase.database();
+        console.log('Orders dashboard connected to Firebase Realtime Database 🚀');
+      } catch (e) {
+        console.warn('RTDB notice:', e);
+      }
+      try {
+        db = firebase.firestore();
+      } catch (e) {}
     }
   } catch (e) {
     console.warn('Firebase notice:', e);
@@ -126,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
             games: Array.isArray(o.games) ? o.games : [],
             itemsCount: o.itemsCount || (Array.isArray(o.games) && o.games.length ? o.games.length : 1),
             gameTitle: o.gameTitle || (Array.isArray(o.games) && o.games.length ? o.games.map(g => g.title).join(' + ') : 'لعبة PlayStation'),
-            gameImage: o.gameImage || (Array.isArray(o.games) && o.games[0] ? o.games[0].image : 'gta.jpeg'),
+            gameImage: o.gameImage || (Array.isArray(o.games) && o.games[0] ? o.games[0].image : ''),
             customerName: o.customerName || 'عميل',
             customerPhone: o.customerPhone || '',
             consoleType: o.consoleType || 'PlayStation 5 (PS5)',
@@ -295,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="empty-orders-state">
           <div class="empty-icon-wrap"><i class="fa-solid fa-clipboard-check"></i></div>
           <h3 class="empty-orders-title">لا توجد طلبات تطابق هذا البحث أو الفلتر</h3>
-          <p class="empty-orders-sub">عندما يقوم أي عميل بطلب لعبة من المتجر، ستظهر بياناته هنا فوراً في نفس اللحظة.</p>
+          <p class="empty-orders-sub">عندما يقوم أي عميل بطلب لعبة من المتجر، ستظهر بياناته هنا فوراً في نفس اللحظة عبر السحابة.</p>
         </div>
       `;
       return;
@@ -328,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const isGPrimary = (g.accountType || '').includes('برايمري');
           return `
             <div class="order-game-item-subrow">
-              <img src="${resolveImg(g.image)}" alt="${g.title}" class="order-game-mini-thumb" onerror="this.src='../gta.jpeg'" />
+              <img src="${resolveImg(g.image)}" alt="${g.title}" class="order-game-mini-thumb" onerror="this.onerror=null; this.src='${DEFAULT_GAME_THUMB}';" />
               <div class="order-game-mini-info">
                 <span class="order-game-mini-title" title="${g.title}">${g.title}</span>
                 <div class="order-badges-wrap">
@@ -362,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gamesColumnHtml = `
           <div class="order-col-game">
-            <img src="${resolveImg(order.gameImage)}" alt="${order.gameTitle}" class="order-game-thumb-img" onerror="this.src='../gta.jpeg'" />
+            <img src="${resolveImg(order.gameImage)}" alt="${order.gameTitle}" class="order-game-thumb-img" onerror="this.onerror=null; this.src='${DEFAULT_GAME_THUMB}';" />
             <div class="order-game-details">
               <span class="order-id-tag">#${order.id}</span>
               <h4 class="order-game-name" title="${order.gameTitle}">${order.gameTitle}</h4>
@@ -436,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --------------------------------------------------------------------------
-  // 7. ORDER OPERATIONS (Update Status, Export)
+  // 7. ORDER OPERATIONS (Update Status, Export, Delete)
   // --------------------------------------------------------------------------
   const updateOrderStatus = (orderId, newStatus) => {
     const idx = allOrders.findIndex(o => o.id === orderId);
@@ -446,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const updatedOrder = { ...allOrders[idx] };
       saveStoredOrders(allOrders);
 
-      // Notify other tabs
+      // Notify other local tabs
       try {
         if ('BroadcastChannel' in window) {
           const bc = new BroadcastChannel('elmohands_orders_sync');
@@ -455,15 +467,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (e) {}
 
-      // Cloud Sync - Always write full order object to prevent field deletion in Firestore
-      if (db) {
-        db.collection('orders').doc(orderId).set(updatedOrder, { merge: true })
-          .then(() => showToast(`تم تغيير حالة الطلب إلى "${newStatus}" وتحديثها سحابياً`))
-          .catch((err) => console.warn('Cloud status update error:', err));
-      } else {
-        showToast(`تم تغيير حالة الطلب إلى "${newStatus}"`);
+      // Realtime Database Cloud Sync
+      if (rtdb) {
+        rtdb.ref('orders/' + orderId).update({
+          status: newStatus,
+          updatedAt: updatedOrder.updatedAt
+        }).catch(err => console.warn('RTDB status update error:', err));
       }
 
+      // REST API PATCH fallback
+      try {
+        fetch(`https://elmohands-store-default-rtdb.firebaseio.com/orders/${orderId}.json`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus, updatedAt: updatedOrder.updatedAt })
+        }).catch(() => {});
+      } catch (e) {}
+
+      showToast(`تم تغيير حالة الطلب إلى "${newStatus}" سحابياً ✨`);
       renderOrders();
     }
   };
@@ -480,15 +501,19 @@ document.addEventListener('DOMContentLoaded', () => {
       allOrders = allOrders.filter(o => !o.status || (!o.status.includes('مكتمل') && !o.status.includes('تسليم')));
       saveStoredOrders(allOrders);
 
-      if (db) {
-        const batch = db.batch();
-        completedOrders.forEach(o => {
-          batch.delete(db.collection('orders').doc(o.id));
-        });
-        batch.commit().catch(err => console.warn('Batch delete error:', err));
-      }
+      // Delete from Realtime Database Cloud
+      completedOrders.forEach(o => {
+        if (rtdb) {
+          rtdb.ref('orders/' + o.id).remove().catch(() => {});
+        }
+        try {
+          fetch(`https://elmohands-store-default-rtdb.firebaseio.com/orders/${o.id}.json`, {
+            method: 'DELETE'
+          }).catch(() => {});
+        } catch (e) {}
+      });
 
-      showToast('تم تنظيف الطلبات المكتملة بنجاح ✨');
+      showToast('تم تنظيف الطلبات المكتملة سحابياً بنجاح ✨');
       renderOrders();
     }
   });
@@ -574,130 +599,122 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Manual Refresh
   document.getElementById('btn-manual-refresh')?.addEventListener('click', () => {
-    allOrders = getStoredOrders();
-    renderOrders();
-    showToast('تم تحديث قائمة الطلبات 🔄');
+    fetchCloudOrdersDirect();
+    showToast('جاري تحديث قائمة الطلبات سحابياً 🔄');
   });
 
   // --------------------------------------------------------------------------
-  // 9. INSTANT & REALTIME SYNCHRONIZATION ENGINE
+  // 9. INSTANT & REALTIME CLOUD SYNCHRONIZATION ENGINE
   // --------------------------------------------------------------------------
   let isInitialLoad = true;
 
-  const reloadAndCheckNewOrders = () => {
-    const local = getStoredOrders();
-    if (local.length > allOrders.length) {
-      if (!isInitialLoad) {
-        playNewOrderSound();
-        showToast('🔔 وصل طلب عميل جديد الآن!');
-      }
+  const processIncomingOrders = (cloudOrdersMap) => {
+    const list = [];
+    if (cloudOrdersMap && typeof cloudOrdersMap === 'object') {
+      Object.keys(cloudOrdersMap).forEach(key => {
+        const item = cloudOrdersMap[key];
+        if (item && typeof item === 'object') {
+          list.push({
+            id: item.id || key,
+            games: Array.isArray(item.games) ? item.games : [],
+            itemsCount: item.itemsCount || (Array.isArray(item.games) && item.games.length ? item.games.length : 1),
+            gameTitle: item.gameTitle || (Array.isArray(item.games) && item.games.length ? item.games.map(g => g.title).join(' + ') : 'لعبة'),
+            gameImage: item.gameImage || (Array.isArray(item.games) && item.games[0] ? item.games[0].image : ''),
+            customerName: item.customerName || 'عميل',
+            customerPhone: item.customerPhone || '',
+            consoleType: item.consoleType || 'PlayStation 5 (PS5)',
+            accountType: item.accountType || 'برايمري (Primary)',
+            notes: item.notes || '',
+            timeFormatted: item.timeFormatted || '',
+            dateFormatted: item.dateFormatted || '',
+            createdAt: item.createdAt || new Date().toISOString(),
+            timestamp: item.timestamp || (item.createdAt ? new Date(item.createdAt).getTime() : Date.now()),
+            status: item.status || 'جديد'
+          });
+        }
+      });
     }
-    if (JSON.stringify(local) !== JSON.stringify(allOrders)) {
-      allOrders = local;
-      renderOrders();
+
+    list.sort((a, b) => {
+      const tA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const tB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return tB - tA;
+    });
+
+    if (!isInitialLoad && list.length > allOrders.length) {
+      playNewOrderSound();
+      showToast('🔔 وصل طلب عميل جديد الآن!');
     }
+
+    allOrders = list;
+    saveStoredOrders(allOrders);
+    renderOrders();
+    isInitialLoad = false;
+  };
+
+  const fetchCloudOrdersDirect = () => {
+    fetch('https://elmohands-store-default-rtdb.firebaseio.com/orders.json')
+      .then(res => res.json())
+      .then(data => {
+        if (data) {
+          processIncomingOrders(data);
+        } else if (isInitialLoad) {
+          allOrders = getStoredOrders();
+          renderOrders();
+          isInitialLoad = false;
+        }
+      })
+      .catch(err => {
+        console.warn('Direct cloud fetch notice:', err);
+        if (isInitialLoad) {
+          allOrders = getStoredOrders();
+          renderOrders();
+          isInitialLoad = false;
+        }
+      });
   };
 
   const initOrdersSync = () => {
-    // 1. Initial Local load
+    // 1. Initial Local load for instant display
     allOrders = getStoredOrders();
     renderOrders();
 
-    // 2. BroadcastChannel for instant cross-tab / cross-window sync
+    // 2. Direct HTTP fetch for immediate cloud data
+    fetchCloudOrdersDirect();
+
+    // 3. Realtime WebSockets listener via Firebase Realtime Database
+    if (rtdb) {
+      rtdb.ref('orders').on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+          processIncomingOrders(val);
+          console.log('⚡ Realtime Database synced orders');
+        }
+      }, (err) => {
+        console.warn('Realtime Database listener error:', err);
+      });
+    }
+
+    // 4. Polling fallback every 4000ms
+    setInterval(fetchCloudOrdersDirect, 4000);
+
+    // 5. BroadcastChannel for instant local tab sync
     try {
       if ('BroadcastChannel' in window) {
         const bc = new BroadcastChannel('elmohands_orders_sync');
-        bc.onmessage = (event) => {
-          reloadAndCheckNewOrders();
+        bc.onmessage = () => {
+          fetchCloudOrdersDirect();
         };
       }
-    } catch (e) {
-      console.warn('BroadcastChannel sync notice:', e);
-    }
+    } catch (e) {}
 
-    // 3. Storage Event listener
-    window.addEventListener('storage', (e) => {
-      if (e.key === STORAGE_KEY_ORDERS) {
-        reloadAndCheckNewOrders();
-      }
-    });
-
-    // 4. Window Focus & Visibility changes
-    window.addEventListener('focus', reloadAndCheckNewOrders);
+    // 6. Window Focus & Visibility events
+    window.addEventListener('focus', fetchCloudOrdersDirect);
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        reloadAndCheckNewOrders();
+        fetchCloudOrdersDirect();
       }
     });
-
-    // 5. Periodic polling fallback every 1000ms
-    setInterval(reloadAndCheckNewOrders, 1000);
-
-    // 6. Firebase Cloud Realtime Listener
-    if (db) {
-      db.collection('orders').onSnapshot((snapshot) => {
-        const localOrders = getStoredOrders();
-        const cloudOrders = [];
-
-        snapshot.forEach(doc => {
-          const data = doc.data() || {};
-          const localCopy = localOrders.find(l => l.id === doc.id) || allOrders.find(a => a.id === doc.id) || {};
-
-          // Safely preserve every field so status updates cannot wipe customer data
-          const mergedOrder = {
-            id: doc.id,
-            games: Array.isArray(data.games) ? data.games : (Array.isArray(localCopy.games) ? localCopy.games : []),
-            itemsCount: data.itemsCount || localCopy.itemsCount || (Array.isArray(data.games) && data.games.length ? data.games.length : (Array.isArray(localCopy.games) && localCopy.games.length ? localCopy.games.length : 1)),
-            gameId: data.gameId || localCopy.gameId || '',
-            gameTitle: data.gameTitle || localCopy.gameTitle || 'لعبة',
-            gameImage: data.gameImage || localCopy.gameImage || 'gta.jpeg',
-            customerName: data.customerName || localCopy.customerName || 'عميل',
-            customerPhone: data.customerPhone || localCopy.customerPhone || '',
-            consoleType: data.consoleType || localCopy.consoleType || 'PlayStation 5 (PS5)',
-            accountType: data.accountType || localCopy.accountType || 'برايمري (Primary)',
-            notes: data.notes || localCopy.notes || '',
-            timeFormatted: data.timeFormatted || localCopy.timeFormatted || '',
-            dateFormatted: data.dateFormatted || localCopy.dateFormatted || '',
-            createdAt: data.createdAt || localCopy.createdAt || new Date().toISOString(),
-            timestamp: data.timestamp || localCopy.timestamp || Date.now(),
-            status: data.status || localCopy.status || 'جديد'
-          };
-
-          cloudOrders.push(mergedOrder);
-        });
-
-        // Also preserve any local orders that might not be in cloudOrders yet
-        localOrders.forEach(localOrd => {
-          if (!cloudOrders.some(c => c.id === localOrd.id)) {
-            cloudOrders.push(localOrd);
-            // Push missing order to Firestore
-            db.collection('orders').doc(localOrd.id).set(localOrd).catch(() => {});
-          }
-        });
-
-        cloudOrders.sort((a, b) => {
-          const tA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-          const tB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-          return tB - tA;
-        });
-
-        if (!isInitialLoad && cloudOrders.length > allOrders.length) {
-          playNewOrderSound();
-          showToast('🔔 وصل طلب عميل جديد الآن!');
-        }
-
-        allOrders = cloudOrders;
-        saveStoredOrders(allOrders);
-        renderOrders();
-
-        isInitialLoad = false;
-        console.log('⚡ Orders synchronized with Firestore cloud:', cloudOrders.length, 'orders');
-      }, (err) => {
-        console.warn('Firestore orders sync warning:', err);
-      });
-    } else {
-      isInitialLoad = false;
-    }
   };
 
   initOrdersSync();
