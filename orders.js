@@ -636,6 +636,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
       });
 
+      // Broadcast to all open tabs
+      try {
+        if ('BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('elmohands_orders_sync');
+          bc.postMessage({ type: 'CLEARED_COMPLETED' });
+          bc.close();
+        }
+      } catch (e) {}
+
       showToast('تم تنظيف الطلبات المكتملة سحابياً بنجاح ✨');
       renderOrders();
     }
@@ -781,13 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('https://elmohands-store-default-rtdb.firebaseio.com/orders.json')
       .then(res => res.json())
       .then(data => {
-        if (data) {
-          processIncomingOrders(data);
-        } else if (isInitialLoad) {
-          allOrders = getStoredOrders();
-          renderOrders();
-          isInitialLoad = false;
-        }
+        processIncomingOrders(data || {});
       })
       .catch(err => {
         console.warn('Direct cloud fetch notice:', err);
@@ -811,17 +814,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (rtdb) {
       rtdb.ref('orders').on('value', (snapshot) => {
         const val = snapshot.val();
-        if (val) {
-          processIncomingOrders(val);
-          console.log('⚡ Realtime Database synced orders');
-        }
+        processIncomingOrders(val || {});
+        console.log('⚡ Realtime Database synced orders');
       }, (err) => {
         console.warn('Realtime Database listener error:', err);
       });
     }
 
-    // 4. Polling fallback every 3000ms
-    setInterval(fetchCloudOrdersDirect, 3000);
+    // 4. Polling fallback every 2000ms
+    setInterval(fetchCloudOrdersDirect, 2000);
 
     // 5. BroadcastChannel for instant local tab sync
     try {
