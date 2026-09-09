@@ -725,100 +725,130 @@ html, body {
   color: #d8b4fe;
 }
 
-/* Customer Column in Card */
+/* Customer Column in Card: Centered Clean Card */
 .order-col-customer {
   width: 100%;
-  background: rgba(7, 9, 15, 0.55);
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(11, 16, 29, 0.85);
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(0, 240, 255, 0.15);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
-.customer-info-row {
+.customer-info-box {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
 }
 
 .customer-name-display {
-  font-size: 0.94rem;
-  font-weight: 800;
+  font-size: 1.05rem;
+  font-weight: 900;
   color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.customer-quick-actions {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-.btn-quick-contact {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 7px;
+}
+
+.customer-name-display i {
+  color: var(--accent-cyan);
+  font-size: 1.15rem;
+}
+
+.customer-name-text {
+  letter-spacing: 0.3px;
+}
+
+.customer-phone-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  padding: 5px 12px;
   border-radius: var(--radius-full);
-  font-size: 0.72rem;
+}
+
+.phone-icon-accent {
+  color: var(--accent-cyan);
+  font-size: 0.85rem;
+}
+
+.customer-phone-number {
+  font-size: 0.95rem;
+  color: #fff;
+  font-family: var(--font-en);
   font-weight: 800;
-  text-decoration: none;
-  transition: all var(--transition-fast);
+  direction: ltr;
+  letter-spacing: 0.8px;
 }
 
-.btn-quick-contact:active {
-  transform: scale(0.92);
-}
-
-.btn-quick-contact.btn-call {
+.btn-copy-phone {
   background: rgba(0, 240, 255, 0.15);
   border: 1px solid var(--accent-cyan);
   color: var(--accent-cyan);
-}
-
-.btn-quick-contact.btn-wa {
-  background: rgba(37, 211, 102, 0.18);
-  border: 1px solid #25D366;
-  color: #25D366;
-}
-
-.customer-phone-display {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  direction: ltr;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-family: var(--font-en);
-  font-weight: 600;
+  gap: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-ar);
+}
+
+.btn-copy-phone:hover,
+.btn-copy-phone:active {
+  background: var(--accent-cyan);
+  color: #07090f;
+  border-color: var(--accent-cyan);
+  transform: scale(1.04);
+}
+
+.btn-copy-phone.copied {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
 }
 
 .customer-notes-bubble {
-  font-size: 0.76rem;
-  color: #e2e8f0;
-  background: rgba(255, 183, 3, 0.08);
-  border: 1px solid rgba(255, 183, 3, 0.25);
-  padding: 4px 8px;
-  border-radius: 6px;
-  display: flex;
+  font-size: 0.82rem;
+  color: #f1f5f9;
+  background: rgba(255, 183, 3, 0.1);
+  border: 1px solid rgba(255, 183, 3, 0.3);
+  padding: 6px 14px;
+  border-radius: 8px;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 2px;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
 }
 
-/* Status Selector in Card */
+/* Status Selector in Card - 100% Full Width, Completely Separated */
 .order-col-status {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.status-field-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  display: block;
 }
 
 .status-select-wrapper {
@@ -828,27 +858,41 @@ html, body {
 
 .status-select-badge {
   width: 100%;
-  padding: 9px 32px 9px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.86rem;
-  font-weight: 800;
+  min-height: 48px;
+  padding: 12px 16px 12px 38px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 900;
   font-family: var(--font-ar);
-  border: 1.5px solid transparent;
+  border: 2px solid transparent;
   outline: none;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  transition: all var(--transition-fast);
+}
+
+.status-select-badge option {
+  background: #0d121f;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 12px 14px;
 }
 
 .status-select-arrow {
   position: absolute;
-  left: 10px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: #fff;
-  opacity: 0.7;
+  opacity: 0.85;
+  z-index: 3;
 }
 
 .status-select-badge.status-val-new {
@@ -985,9 +1029,11 @@ html, body {
 
 @media (min-width: 900px) {
   .order-card-row {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: 320px 1fr 240px;
     align-items: center;
-    justify-content: space-between;
+    gap: 24px;
+    padding: 16px 20px;
   }
 
   .order-mobile-topbar {
@@ -995,18 +1041,34 @@ html, body {
   }
 
   .order-col-game {
-    max-width: 320px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .order-col-customer {
-    width: auto;
+    width: 100%;
     background: transparent;
     border: none;
-    padding: 0;
+    padding: 0 16px;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
 
   .order-col-status {
-    width: 180px;
+    width: 100%;
+    min-width: 220px;
+    padding-top: 0;
+  }
+
+  .status-select-badge {
+    width: 100%;
+    min-width: 220px;
+    min-height: 48px;
+    font-size: 0.95rem;
+    padding: 12px 16px 12px 38px;
   }
 }
 

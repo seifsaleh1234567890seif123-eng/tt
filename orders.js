@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const RTDB_URL = 'https://elmohands-store-default-rtdb.firebaseio.com';
   
   let allOrders = [];
+  let rtdb = null;
   let activeStatusFilter = 'all';
   let activeSearchTerm = '';
   let activeConsoleFilter = 'all';
@@ -486,32 +487,24 @@ document.addEventListener('DOMContentLoaded', () => {
           ${gamesColumnHtml}
         </div>
 
-        <!-- Customer Info & Quick Contact Buttons -->
+        <!-- Customer Info: Centered Name & Phone with Copy -->
         <div class="order-col-customer">
-          <div class="customer-info-row">
+          <div class="customer-info-box">
             <div class="customer-name-display">
-              <i class="fa-solid fa-circle-user" style="color: var(--accent-cyan);"></i>
-              <span>${order.customerName || 'بدون اسم'}</span>
+              <i class="fa-solid fa-circle-user"></i>
+              <span class="customer-name-text">${order.customerName || 'بدون اسم'}</span>
             </div>
             
-            <!-- Quick Contact Links -->
-            <div class="customer-quick-actions">
-              ${cleanPhone ? `
-                <a href="tel:${order.customerPhone}" class="btn-quick-contact btn-call" title="اتصال مباشر">
-                  <i class="fa-solid fa-phone"></i>
-                  <span>اتصال</span>
-                </a>
-                <a href="${waLink}" target="_blank" class="btn-quick-contact btn-wa" title="محادثة واتساب">
-                  <i class="fa-brands fa-whatsapp"></i>
-                  <span>واتساب</span>
-                </a>
+            <div class="customer-phone-wrap">
+              <i class="fa-solid fa-phone-flip phone-icon-accent"></i>
+              <span class="customer-phone-number">${order.customerPhone || 'بدون رقم'}</span>
+              ${order.customerPhone ? `
+                <button type="button" class="btn-copy-phone" data-phone="${order.customerPhone}" title="نسخ رقم الهاتف">
+                  <i class="fa-regular fa-copy"></i>
+                  <span>نسخ</span>
+                </button>
               ` : ''}
             </div>
-          </div>
-
-          <div class="customer-phone-display">
-            <i class="fa-solid fa-mobile-screen-button" style="color: var(--text-muted);"></i>
-            <span>${order.customerPhone || 'بدون رقم'}</span>
           </div>
 
           ${order.notes ? `
@@ -522,8 +515,9 @@ document.addEventListener('DOMContentLoaded', () => {
           ` : ''}
         </div>
 
-        <!-- Status Selector & Action Footer -->
+        <!-- Status Selector Section: 100% Full Width & Completely Separated -->
         <div class="order-col-status">
+          <label class="status-field-label">حالة الطلب الحالية:</label>
           <div class="status-select-wrapper">
             <select class="status-select-badge ${statusClass}" data-id="${order.id}">
               <option value="جديد" ${statusVal.includes('جديد') ? 'selected' : ''}>⏳ جديد / قيد الانتظار</option>
@@ -542,12 +536,45 @@ document.addEventListener('DOMContentLoaded', () => {
     ordersContainer.innerHTML = '';
     ordersContainer.appendChild(fragment);
 
-    // Attach Status change listeners
+    // Attach Status change listeners (Robust for Mobile & Touch)
     ordersContainer.querySelectorAll('.status-select-badge').forEach(select => {
-      select.addEventListener('change', (e) => {
+      const handleStatusChange = (e) => {
         const orderId = e.target.dataset.id;
         const newStatus = e.target.value;
-        updateOrderStatus(orderId, newStatus);
+        if (orderId && newStatus) {
+          updateOrderStatus(orderId, newStatus);
+        }
+      };
+
+      select.addEventListener('change', handleStatusChange);
+      select.addEventListener('input', handleStatusChange);
+    });
+
+    // Attach Phone copy listeners
+    ordersContainer.querySelectorAll('.btn-copy-phone').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const phone = btn.dataset.phone;
+        if (phone) {
+          navigator.clipboard.writeText(phone).then(() => {
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>تم النسخ</span>';
+            btn.classList.add('copied');
+            showToast(`تم نسخ رقم الهاتف: ${phone} 📋`);
+            setTimeout(() => {
+              btn.innerHTML = '<i class="fa-regular fa-copy"></i> <span>نسخ</span>';
+              btn.classList.remove('copied');
+            }, 2000);
+          }).catch(() => {
+            // Fallback copy
+            const temp = document.createElement('input');
+            temp.value = phone;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast(`تم نسخ الرقم: ${phone} 📋`);
+          });
+        }
       });
     });
   };
@@ -586,7 +613,26 @@ document.addEventListener('DOMContentLoaded', () => {
       }).catch(() => {});
 
       showToast(`تم تغيير حالة الطلب إلى "${newStatus}" سحابياً ✨`);
-      renderOrders();
+
+      // Update card visual class directly without rebuilding the whole DOM
+      const cardRow = document.querySelector(`.order-card-row[data-id="${orderId}"]`);
+      if (cardRow) {
+        const selectEl = cardRow.querySelector('.status-select-badge');
+        if (selectEl) {
+          selectEl.className = 'status-select-badge';
+          if (newStatus.includes('تواصل')) selectEl.classList.add('status-val-contacted');
+          else if (newStatus.includes('مكتمل') || newStatus.includes('تسليم')) selectEl.classList.add('status-val-completed');
+          else if (newStatus.includes('ملغي') || newStatus.includes('إلغاء')) selectEl.classList.add('status-val-cancelled');
+          else selectEl.classList.add('status-val-new');
+        }
+        if (newStatus.includes('جديد')) {
+          cardRow.classList.add('is-new-order');
+        } else {
+          cardRow.classList.remove('is-new-order');
+        }
+      }
+
+      updateStatsAndPills(allOrders);
     }
   };
 
@@ -759,7 +805,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Always update allOrders to match cloud state exactly (including empty array when all deleted)
     allOrders = list;
     saveStoredOrders(allOrders);
-    renderOrders();
+
+    // If the user currently has a select dropdown focused/active, do not re-render DOM to avoid closing their dropdown
+    const activeEl = document.activeElement;
+    const isInteractingWithSelect = activeEl && (activeEl.tagName === 'SELECT' || activeEl.classList.contains('status-select-badge'));
+    if (!isInteractingWithSelect) {
+      renderOrders();
+    } else {
+      updateStatsAndPills(allOrders);
+    }
     isInitialLoad = false;
   };
 
@@ -847,7 +901,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initSSEStream();
 
     // 4. Firebase Realtime Database SDK Fallback Listener
-    let rtdb = null;
     try {
       const firebaseConfig = {
         apiKey: "AIzaSyCs-VmEzb7q8oIAzGZ8QpHllPI0yGtdsPA",
